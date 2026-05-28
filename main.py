@@ -5,45 +5,55 @@ import os
 
 app = FastAPI()
 
-# ==========================
-# Middleware
-# ==========================
+# ==========================================
+# CORS
+# ==========================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # change later after deployment
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ==========================
-# Database Connection
-# ==========================
+# ==========================================
+# DATABASE CONNECTION
+# ==========================================
 
 def get_db_connection():
-    
 
     connection = mysql.connector.connect(
-    host=os.getenv("DB_HOST"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_NAME"),
-    port=int(os.getenv("DB_PORT", 3306))
-)
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME"),
+        port=int(os.getenv("DB_PORT")),
+        ssl_disabled=False
+    )
 
     return connection
 
 
-# Create connection
-connn_obj = get_db_connection()
-cursor = connn_obj.cursor()
-# ==========================
-# Add Expense
-# ==========================
+# ==========================================
+# HEALTH CHECK ROUTE
+# ==========================================
+
+@app.get("/")
+def home():
+    return {"message": "Expense Tracker API Running Successfully"}
+
+
+# ==========================================
+# ADD EXPENSE
+# ==========================================
 
 @app.post("/add_expense")
 def add_expense(expense: dict):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     try:
         query = """
         INSERT INTO expenses
@@ -60,20 +70,28 @@ def add_expense(expense: dict):
         )
 
         cursor.execute(query, values)
-        connn_obj.commit()
+        conn.commit()
 
         return {"msg": "Expense added successfully"}
 
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# View All Expenses
-# ==========================
+
+# ==========================================
+# VIEW ALL EXPENSES
+# ==========================================
 
 @app.get("/get_all_expenses")
 def get_all_expenses():
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     try:
         query = "SELECT * FROM expenses"
 
@@ -85,13 +103,20 @@ def get_all_expenses():
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Get Single Expense
-# ==========================
+
+# ==========================================
+# GET SINGLE EXPENSE
+# ==========================================
 
 @app.get("/get_single_expense/{expense_id}")
 def get_single_expense(expense_id: int):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     try:
         query = "SELECT * FROM expenses WHERE expense_id=%s"
@@ -104,13 +129,23 @@ def get_single_expense(expense_id: int):
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Update Expense
-# ==========================
+
+# ==========================================
+# UPDATE EXPENSE
+# ==========================================
 
 @app.put("/update_expense/{expense_id}")
-def update_expense(expense_id: int, updated_expense: dict):
+def update_expense(
+    expense_id: int,
+    updated_expense: dict
+):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     try:
         query = """
@@ -124,48 +159,71 @@ def update_expense(expense_id: int, updated_expense: dict):
         """
 
         values = (
-            updated_expense["c"],
-            updated_expense["a"],
-            updated_expense["p"],
-            updated_expense["e"],
-            updated_expense["d"],
+            updated_expense["category"],
+            updated_expense["amount"],
+            updated_expense["payment_method"],
+            updated_expense["expense_date"],
+            updated_expense["description"],
             expense_id
         )
 
         cursor.execute(query, values)
-        connn_obj.commit()
+        conn.commit()
 
-        return {"updated_msg": "Expense updated successfully"}
+        return {
+            "updated_msg":
+            "Expense updated successfully"
+        }
 
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Delete Expense
-# ==========================
+
+# ==========================================
+# DELETE EXPENSE
+# ==========================================
 
 @app.delete("/delete_expense/{expense_id}")
 def delete_expense(expense_id: int):
 
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     try:
-        query = "DELETE FROM expenses WHERE expense_id=%s"
+        query = """
+        DELETE FROM expenses
+        WHERE expense_id=%s
+        """
 
         cursor.execute(query, (expense_id,))
-        connn_obj.commit()
+        conn.commit()
 
-        return {"msg": "Expense deleted successfully"}
+        return {
+            "msg":
+            "Expense deleted successfully"
+        }
 
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Search Expense
-# ==========================
+
+# ==========================================
+# SEARCH EXPENSE
+# ==========================================
 
 @app.get("/view_exp/{search_text}")
 def search_expense(search_text: str):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     try:
         query = """
@@ -176,7 +234,11 @@ def search_expense(search_text: str):
 
         search = f"%{search_text}%"
 
-        cursor.execute(query, (search, search))
+        cursor.execute(
+            query,
+            (search, search)
+        )
+
         data = cursor.fetchall()
 
         return {"search_result": data}
@@ -184,13 +246,23 @@ def search_expense(search_text: str):
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Sort Expense
-# ==========================
+
+# ==========================================
+# SORT EXPENSES
+# ==========================================
 
 @app.get("/sort_exp/{sort_column}/{sort_order}")
-def sort_expenses(sort_column: str, sort_order: str):
+def sort_expenses(
+    sort_column: str,
+    sort_order: str
+):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     try:
 
@@ -202,7 +274,14 @@ def sort_expenses(sort_column: str, sort_order: str):
 
         db_column = column_mapping.get(sort_column)
 
-        order = "ASC" if sort_order == "Asc" else "DESC"
+        if not db_column:
+            return {"error": "Invalid column"}
+
+        order = (
+            "ASC"
+            if sort_order == "Asc"
+            else "DESC"
+        )
 
         query = f"""
         SELECT * FROM expenses
@@ -217,13 +296,20 @@ def sort_expenses(sort_column: str, sort_order: str):
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Filter Expense
-# ==========================
+
+# ==========================================
+# FILTER EXPENSES
+# ==========================================
 
 @app.get("/filter_exp/{category}")
 def filter_expense(category: str):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     try:
         query = """
@@ -239,26 +325,32 @@ def filter_expense(category: str):
     except Exception as e:
         return {"error": str(e)}
 
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==========================
-# Analyze Spending
-# ==========================
+
+# ==========================================
+# ANALYZE SPENDING
+# ==========================================
 
 @app.get("/analyze_spending")
 def analyze_spending():
 
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     try:
-        # Total spending
+
         cursor.execute(
-            "SELECT SUM(amount) AS total FROM expenses"
+            "SELECT SUM(amount) FROM expenses"
         )
 
         total_spending = cursor.fetchone()
 
-        # Category wise spending
         cursor.execute("""
         SELECT category,
-        SUM(amount) AS total
+        SUM(amount)
         FROM expenses
         GROUP BY category
         """)
@@ -275,10 +367,16 @@ def analyze_spending():
 
         return {
             "total_spending": {
-                "total": float(total_spending[0] or 0)
+                "total":
+                float(total_spending[0] or 0)
             },
-            "category_spending": final_data
+            "category_spending":
+            final_data
         }
 
     except Exception as e:
         return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        conn.close()
