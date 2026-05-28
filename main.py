@@ -29,7 +29,7 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME"),
         port=int(os.getenv("DB_PORT")),
-        ssl_disabled=True
+        ssl_verify_cert=False
     )
 
 
